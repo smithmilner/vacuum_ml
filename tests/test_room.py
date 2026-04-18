@@ -31,7 +31,7 @@ def test_obstacles_dont_overlap_dock():
         room = Room(width=10.0, height=10.0, seed=seed)
         dock_pt = room.dock
         for obs in room.obstacles:
-            assert not obs.contains(dock_pt), f"obstacle covers dock at seed={seed}"
+            assert not obs.intersects(dock_pt), f"obstacle touches dock at seed={seed}"
 
 
 def test_dirt_at_returns_float_in_range():
@@ -70,5 +70,5 @@ def test_blobs_are_gaussian_blobs():
 def test_different_seeds_produce_different_rooms():
     room_a = Room(width=10.0, height=10.0, seed=1)
     room_b = Room(width=10.0, height=10.0, seed=2)
-    assert room_a.polygon.area != room_b.polygon.area or \
-           room_a.dirt_at(5.0, 5.0) != room_b.dirt_at(5.0, 5.0)
+    assert room_a.blobs[0].cx != room_b.blobs[0].cx or \
+           room_a.blobs[0].cy != room_b.blobs[0].cy
