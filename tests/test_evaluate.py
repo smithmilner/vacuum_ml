@@ -1,4 +1,3 @@
-import os
 import pytest
 from vacuum_ml.training.train import train
 from vacuum_ml.training.evaluate import evaluate

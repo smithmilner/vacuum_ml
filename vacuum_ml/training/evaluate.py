@@ -12,6 +12,8 @@ def evaluate(
     seed: int = 0,
 ) -> dict:
     """Load a saved model and score it over N episodes."""
+    if episodes <= 0:
+        raise ValueError(f"episodes must be >= 1, got {episodes}")
     model = PPO.load(model_path)
     env = VacuumEnv(seed=seed)
 
@@ -44,5 +46,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="models/vacuum_ppo")
     parser.add_argument("--episodes", type=int, default=10)
+    parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
-    evaluate(args.model, args.episodes)
+    evaluate(args.model, args.episodes, args.seed)
