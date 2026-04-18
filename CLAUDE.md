@@ -62,10 +62,21 @@ The project uses **Reinforcement Learning** (PPO) to train a robot vacuum agent 
 
 - **`random_agent.py`**: Uniform-random policy scoring ~47–52% coverage in 200 steps. Run this first to establish a baseline before evaluating trained models.
 
+### Training results (first run)
+
+After 2M steps, the stochastic PPO policy scores ~54% coverage vs ~51% random baseline — marginal improvement. The deterministic policy (`--deterministic` flag) collapses to a single direction (~7%). Both are expected first-iteration results with a flat MLP policy on a 202-dim observation.
+
+The model hits a local optimum around 500k steps (`ep_rew_mean ~44`). More timesteps alone won't fix it.
+
+**Known improvement paths (roughly ordered by impact):**
+1. **CNN policy** — the 2D room grid has spatial structure; `CnnPolicy` with a (2, H, W) observation would exploit it. Requires changing `observation_space` to `Box(shape=(2, H, W))` and returning `room.get_state().transpose(2,0,1)` from `_obs()`.
+2. **Curriculum learning** — train first on obstacle-free fixed rooms, then randomize. Add `obstacle_density=0.0` option to `VacuumEnv`.
+3. **Reward shaping** — add a small bonus for being adjacent to uncleaned cells ("frontier reward") in `VacuumEnv.step()`.
+4. **Scaling up** — increase `--envs` for more CPU parallelism; increase `--timesteps` once architecture is improved.
+
 ### Scaling up
 
 - Increase `--envs` (parallel environments) to use more CPU cores during training
-- Increase `--timesteps` for longer training (larger grids may need 2–5M steps)
 - Change `VacuumEnv(width=..., height=...)` to train on larger rooms (default 10×10)
 - Reward shaping is in `VacuumEnv.step()` — adjust the dirt multiplier if the agent ignores dirty areas
 
