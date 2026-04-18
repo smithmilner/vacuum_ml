@@ -1,38 +1,74 @@
 import numpy as np
-from vacuum_ml.env.room import Room
+import pytest
+from shapely.geometry import Point
+from vacuum_ml.env.room import Room, GaussianBlob
 
-def test_room_shape():
-    room = Room(width=8, height=6)
-    assert room.cleanliness.shape == (6, 8)
-    assert room.obstacles.shape == (6, 8)
 
-def test_start_position_always_clear():
+def make_room(seed=42):
+    return Room(width=10.0, height=10.0, seed=seed)
+
+
+def test_polygon_is_valid():
+    room = make_room()
+    assert room.polygon.is_valid
+    assert room.polygon.area > 0
+
+
+def test_dock_inside_room():
+    for seed in range(10):
+        room = Room(width=10.0, height=10.0, seed=seed)
+        assert room.contains(room.dock.x, room.dock.y), f"dock outside room for seed={seed}"
+
+
+def test_obstacles_inside_polygon():
+    room = make_room(seed=0)
+    for obs in room.obstacles:
+        assert room.polygon.contains(obs), "obstacle outside polygon"
+
+
+def test_obstacles_dont_overlap_dock():
     for seed in range(20):
-        room = Room(width=10, height=10, obstacle_density=0.5, seed=seed)
-        assert not room.obstacles[0, 0], f"seed {seed}: start blocked"
+        room = Room(width=10.0, height=10.0, seed=seed)
+        dock_pt = room.dock
+        for obs in room.obstacles:
+            assert not obs.contains(dock_pt), f"obstacle covers dock at seed={seed}"
 
-def test_obstacle_density_approximate():
-    room = Room(width=20, height=20, obstacle_density=0.2, seed=42)
-    ratio = room.obstacles.sum() / (20 * 20)
-    assert 0.10 < ratio < 0.35
 
-def test_cleanliness_range():
-    room = Room(width=10, height=10, seed=0)
-    free = ~room.obstacles
-    assert room.cleanliness[free].min() >= 0.0
-    assert room.cleanliness[free].max() <= 1.0
+def test_dirt_at_returns_float_in_range():
+    room = make_room()
+    for x in [1.0, 3.0, 5.0, 9.0]:
+        for y in [1.0, 3.0, 5.0, 9.0]:
+            d = room.dirt_at(x, y)
+            assert 0.0 <= d <= 1.0, f"dirt out of range at ({x},{y}): {d}"
 
-def test_obstacles_have_zero_cleanliness():
-    room = Room(width=10, height=10, seed=0)
-    assert (room.cleanliness[room.obstacles] == 0.0).all()
 
-def test_cleanable_cells_excludes_obstacles():
-    room = Room(width=5, height=5, obstacle_density=0.3, seed=1)
-    assert room.cleanable_cells == (5 * 5) - int(room.obstacles.sum())
-    assert room.cleanable_cells < 5 * 5  # actually has some obstacles
+def test_contains_interior_point():
+    room = make_room()
+    assert room.contains(5.0, 5.0)
 
-def test_get_state_shape():
-    room = Room(width=8, height=6, seed=0)
-    state = room.get_state()
-    assert state.shape == (6, 8, 2)
-    assert state.dtype == np.float32
+
+def test_contains_rejects_outside():
+    room = make_room()
+    assert not room.contains(-1.0, 5.0)
+    assert not room.contains(15.0, 5.0)
+
+
+def test_cleanable_area_positive():
+    room = make_room()
+    assert room.cleanable_area > 0
+
+
+def test_blobs_are_gaussian_blobs():
+    room = make_room()
+    assert len(room.blobs) > 0
+    for b in room.blobs:
+        assert isinstance(b, GaussianBlob)
+        assert b.sigma > 0
+        assert 0 < b.peak <= 1.0
+
+
+def test_different_seeds_produce_different_rooms():
+    room_a = Room(width=10.0, height=10.0, seed=1)
+    room_b = Room(width=10.0, height=10.0, seed=2)
+    assert room_a.polygon.area != room_b.polygon.area or \
+           room_a.dirt_at(5.0, 5.0) != room_b.dirt_at(5.0, 5.0)
