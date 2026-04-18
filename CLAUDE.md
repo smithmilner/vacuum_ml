@@ -62,17 +62,18 @@ The project uses **Reinforcement Learning** (PPO) to train a robot vacuum agent 
 
 - **`random_agent.py`**: Uniform-random policy scoring ~47–52% coverage in 200 steps. Run this first to establish a baseline before evaluating trained models.
 
-### Training results (first run)
+### Training results
 
-After 2M steps, the stochastic PPO policy scores ~54% coverage vs ~51% random baseline — marginal improvement. The deterministic policy (`--deterministic` flag) collapses to a single direction (~7%). Both are expected first-iteration results with a flat MLP policy on a 202-dim observation.
+**MLP policy (flat obs, retired):** After 2M steps, stochastic ~54% vs ~51% random. Deterministic collapsed to a single action (~7%). Hit a local optimum at 500k steps.
 
-The model hits a local optimum around 500k steps (`ep_rew_mean ~44`). More timesteps alone won't fix it.
+**CNN policy (current):** Observation changed to `(3, H, W)` — channels: obstacles, cleanliness, vacuum position. Custom `VacuumCNN` feature extractor in `vacuum_ml/training/policy.py`. After 1M steps, deterministic policy no longer collapses (uses all 4 directions based on state). Some episodes hit 52% deterministically. Still training — needs 4M+ steps to converge fully.
 
-**Known improvement paths (roughly ordered by impact):**
-1. **CNN policy** — the 2D room grid has spatial structure; `CnnPolicy` with a (2, H, W) observation would exploit it. Requires changing `observation_space` to `Box(shape=(2, H, W))` and returning `room.get_state().transpose(2,0,1)` from `_obs()`.
-2. **Curriculum learning** — train first on obstacle-free fixed rooms, then randomize. Add `obstacle_density=0.0` option to `VacuumEnv`.
-3. **Reward shaping** — add a small bonus for being adjacent to uncleaned cells ("frontier reward") in `VacuumEnv.step()`.
-4. **Scaling up** — increase `--envs` for more CPU parallelism; increase `--timesteps` once architecture is improved.
+CNN trains at ~900 fps vs ~6500 fps for MLP. Budget ~1 hour for a good CNN run at 4M steps.
+
+**Next improvement paths:**
+1. **Curriculum learning** — train first on obstacle-free rooms (`obstacle_density=0.0`), then gradually randomize. Reduces initial problem complexity.
+2. **Frontier reward** — small bonus for being adjacent to uncleaned cells in `VacuumEnv.step()`. Guides the agent toward unexplored areas.
+3. **Larger grid** — once the agent reliably cleans 10×10, increase to 15×15 or 20×20.
 
 ### Scaling up
 
