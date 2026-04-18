@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import matplotlib
+matplotlib.use("Agg")  # headless-safe backend
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -7,7 +10,7 @@ from .vacuum_env import VacuumEnv
 
 
 def render_room(env: VacuumEnv, ax: plt.Axes | None = None) -> plt.Figure:
-    """Render a single frame. Returns the figure."""
+    """Render a single frame of the environment. Returns the figure."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
     else:
@@ -16,7 +19,6 @@ def render_room(env: VacuumEnv, ax: plt.Axes | None = None) -> plt.Figure:
     ax.clear()
     h, w = env.height, env.width
 
-    # RGB image: start white, tint yellow for dirty, gray for obstacles, green for cleaned
     img = np.ones((h, w, 3), dtype=np.float32)
 
     free = ~env.room.obstacles
@@ -29,7 +31,7 @@ def render_room(env: VacuumEnv, ax: plt.Axes | None = None) -> plt.Figure:
     ax.imshow(img, origin="upper", interpolation="nearest")
 
     r, c = env.pos
-    ax.plot(c, r, "bs", markersize=12, label="vacuum")
+    ax.plot(c, r, "bs", markersize=12)
 
     coverage = float(env.cleaned.sum()) / env.room.cleanable_cells
     ax.set_title(f"Coverage: {coverage:.1%}   Steps: {env.steps}")
@@ -38,35 +40,45 @@ def render_room(env: VacuumEnv, ax: plt.Axes | None = None) -> plt.Figure:
     return fig
 
 
+def _capture_frame(env: VacuumEnv) -> np.ndarray:
+    """Render current state and return as (H, W, 3) uint8 numpy array."""
+    fig = render_room(env)
+    fig.canvas.draw()
+    buf = np.asarray(fig.canvas.buffer_rgba())
+    frame = buf[:, :, :3].copy()  # drop alpha, copy before figure is closed
+    plt.close(fig)
+    return frame
+
+
 def animate_episode(model, env: VacuumEnv, save_path: str = "episode.gif") -> None:
-    """Run one episode with the model and save an animated GIF."""
-    import matplotlib.animation as animation
+    """Run one episode with model and save as animated GIF.
+
+    model must implement: predict(obs, deterministic=True) -> (action, state)
+    """
+    from PIL import Image
 
     obs, _ = env.reset()
     frames: list[np.ndarray] = []
 
     done = False
     while not done:
-        fig = render_room(env)
-        fig.canvas.draw()
-        frame = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        frame = frame.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-        frames.append(frame)
-        plt.close(fig)
-
+        frames.append(_capture_frame(env))
         action, _ = model.predict(obs, deterministic=True)
         obs, _, terminated, truncated, _ = env.step(int(action))
         done = terminated or truncated
 
-    fig, ax = plt.subplots()
-    im = ax.imshow(frames[0])
-    ax.axis("off")
+    frames.append(_capture_frame(env))  # capture terminal state
 
-    def update(frame):
-        im.set_data(frame)
-        return (im,)
+    if not frames:
+        print("Warning: episode produced no frames, nothing to save.")
+        return
 
-    ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
-    ani.save(save_path, writer="pillow")
-    plt.close(fig)
+    pil_frames = [Image.fromarray(f) for f in frames]
+    pil_frames[0].save(
+        save_path,
+        save_all=True,
+        append_images=pil_frames[1:],
+        loop=0,
+        duration=100,
+    )
     print(f"Saved animation to {save_path}")
