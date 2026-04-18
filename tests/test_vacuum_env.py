@@ -1,85 +1,126 @@
 import numpy as np
-import gymnasium as gym
+import pytest
+from gymnasium import spaces
 from gymnasium.utils.env_checker import check_env
+from shapely.geometry import Point
+
 from vacuum_ml.env.vacuum_env import VacuumEnv
 
-def make_env():
-    return VacuumEnv(width=8, height=8, max_steps=100, seed=42)
 
-def test_observation_space_matches_obs():
+def make_env(seed=42):
+    return VacuumEnv(width=10.0, height=10.0, max_steps=500, seed=seed)
+
+
+def test_action_space_is_continuous_box():
+    env = make_env()
+    assert isinstance(env.action_space, spaces.Box)
+    assert env.action_space.shape == (2,)
+    assert env.action_space.low[0] == -1.0
+    assert env.action_space.low[1] == 0.0
+    assert env.action_space.high[0] == 1.0
+    assert env.action_space.high[1] == 1.0
+
+
+def test_observation_space_is_dict():
+    env = make_env()
+    assert isinstance(env.observation_space, spaces.Dict)
+    assert "map" in env.observation_space.spaces
+    assert "sensors" in env.observation_space.spaces
+    assert env.observation_space["map"].shape == (2, 84, 84)
+    assert env.observation_space["sensors"].shape == (6,)
+
+
+def test_reset_obs_in_space():
     env = make_env()
     obs, _ = env.reset()
-    assert env.observation_space.contains(obs), "reset obs not in obs space"
+    assert env.observation_space.contains(obs)
+
 
 def test_step_obs_in_space():
     env = make_env()
-    obs, _ = env.reset()
-    for action in range(4):
-        obs, reward, terminated, truncated, info = env.step(action)
-        assert env.observation_space.contains(obs)
+    env.reset()
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
+    assert env.observation_space.contains(obs)
 
-def test_start_position_is_zero_zero():
+
+def test_battery_drains_each_step():
     env = make_env()
     env.reset()
-    assert env.pos == (0, 0)
+    initial = env.battery
+    env.step(np.array([0.0, 1.0], dtype=np.float32))
+    assert env.battery < initial
 
-def test_step_counts_increment():
+
+def test_battery_in_sensors():
     env = make_env()
     env.reset()
-    for i in range(5):
-        env.step(0)
-    assert env.steps == 5
+    obs, _, _, _, _ = env.step(np.array([0.0, 0.5], dtype=np.float32))
+    battery_sensor = obs["sensors"][3]
+    assert 0.0 <= battery_sensor <= 1.0
 
-def test_cleaning_reward_positive():
+
+def test_collision_keeps_vacuum_inside_room():
     env = make_env()
     env.reset()
-    assert not env.room.obstacles[0, 1], "test requires (0,1) to be obstacle-free for seed=42"
-    # Move to an uncleaned cell — move right (action=3)
-    _, reward, _, _, _ = env.step(3)
-    assert reward > 0, "moving to new cell should give positive reward"
+    for _ in range(100):
+        env.step(np.array([0.0, 1.0], dtype=np.float32))
+    assert env.room.polygon.contains(Point(env.x, env.y))
 
-def test_revisit_penalised():
+
+def test_docking_with_low_battery_triggers_charging():
     env = make_env()
     env.reset()
-    assert not env.room.obstacles[0, 1], "test requires (0,1) to be obstacle-free for seed=42"
-    env.step(3)   # move right: (0,0) -> (0,1), clean it
-    env.step(2)   # move back left: (0,1) -> (0,0)
-    # Now revisit (0,1) — it was already cleaned
-    _, reward, _, _, _ = env.step(3)
-    # Revisiting a cleaned cell should not give a large positive reward
-    assert reward < 0.5, "revisiting cleaned cell should not yield high reward"
+    env.battery = 0.1
+    env.x = env.dock_x
+    env.y = env.dock_y
+    env.step(np.array([0.0, 0.0], dtype=np.float32))
+    assert env._charging
 
-def test_truncation_at_max_steps():
-    env = VacuumEnv(width=5, height=5, max_steps=10, seed=0)
+
+def test_docking_with_high_battery_terminates():
+    env = make_env()
     env.reset()
-    done = False
-    steps = 0
-    while not done:
-        _, _, terminated, truncated, _ = env.step(0)
-        done = terminated or truncated
-        steps += 1
-    assert steps <= 10
+    env.battery = 0.9
+    env.x = env.dock_x
+    env.y = env.dock_y
+    _, _, terminated, _, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))
+    assert terminated
+
+
+def test_battery_death_away_from_dock_truncates():
+    env = make_env()
+    env.reset()
+    env.battery = 0.001
+    env.x = env.dock_x + 3.0
+    env.y = env.dock_y
+    _, reward, _, truncated, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))
+    assert truncated
+    assert reward <= -4.0
+
+
+def test_charging_restores_battery():
+    env = make_env()
+    env.reset()
+    env.battery = 0.1
+    env.x = env.dock_x
+    env.y = env.dock_y
+    env.step(np.array([0.0, 0.0], dtype=np.float32))  # triggers charge
+    assert env._charging
+    for _ in range(100):
+        env.step(np.array([0.0, 0.0], dtype=np.float32))
+    assert not env._charging
+    assert env.battery >= 0.99
+
 
 def test_coverage_info_key():
     env = make_env()
     env.reset()
-    _, _, _, _, info = env.step(0)
+    _, _, _, _, info = env.step(env.action_space.sample())
     assert "coverage" in info
     assert 0.0 <= info["coverage"] <= 1.0
+
 
 def test_gymnasium_api_compliance():
     env = make_env()
     check_env(env, warn=True)
-
-def test_obs_shape_is_3_channel_2d():
-    env = make_env()
-    obs, _ = env.reset()
-    assert obs.shape == (3, 8, 8), f"expected (3, 8, 8), got {obs.shape}"
-    assert obs.dtype == np.float32
-
-def test_vacuum_position_channel():
-    env = make_env()
-    obs, _ = env.reset()
-    # Channel 2 is the vacuum position; start is (0,0)
-    assert obs[2, 0, 0] == 1.0
-    assert obs[2].sum() == 1.0  # exactly one cell marked
