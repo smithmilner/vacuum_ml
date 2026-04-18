@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from vacuum_ml.env.room import Room
 
 def test_room_shape():
@@ -19,16 +18,18 @@ def test_obstacle_density_approximate():
 
 def test_cleanliness_range():
     room = Room(width=10, height=10, seed=0)
-    assert room.cleanliness.min() >= 0.0
-    assert room.cleanliness.max() <= 1.0
+    free = ~room.obstacles
+    assert room.cleanliness[free].min() >= 0.0
+    assert room.cleanliness[free].max() <= 1.0
 
 def test_obstacles_have_zero_cleanliness():
     room = Room(width=10, height=10, seed=0)
     assert (room.cleanliness[room.obstacles] == 0.0).all()
 
 def test_cleanable_cells_excludes_obstacles():
-    room = Room(width=5, height=5, seed=1)
-    assert room.cleanable_cells == int((~room.obstacles).sum())
+    room = Room(width=5, height=5, obstacle_density=0.3, seed=1)
+    assert room.cleanable_cells == (5 * 5) - int(room.obstacles.sum())
+    assert room.cleanable_cells < 5 * 5  # actually has some obstacles
 
 def test_get_state_shape():
     room = Room(width=8, height=6, seed=0)
