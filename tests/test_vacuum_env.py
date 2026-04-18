@@ -91,7 +91,7 @@ def test_docking_with_high_battery_terminates():
 def test_battery_death_away_from_dock_truncates():
     env = make_env()
     env.reset()
-    env.battery = 0.001
+    env.battery = 0.0001
     env.x = env.dock_x + 3.0
     env.y = env.dock_y
     _, reward, _, truncated, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))

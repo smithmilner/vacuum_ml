@@ -113,7 +113,7 @@ class VacuumEnv(gym.Env):
 
         # Battery drain
         if forward_speed < 0.05:
-            self.battery -= 0.001
+            self.battery -= 0.0005
         elif forward_speed < 0.2:
             self.battery -= 0.001
         else:
