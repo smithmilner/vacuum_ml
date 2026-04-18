@@ -20,8 +20,8 @@ def render_room(env: VacuumEnv, ax: plt.Axes | None = None) -> plt.Figure:
     img = np.ones((h, w, 3), dtype=np.float32)
 
     free = ~env.room.obstacles
-    img[free, 1] = 1.0 - env.room.cleanliness[free] * 0.6  # yellow channel drops with dirt
-    img[free, 2] = 1.0 - env.room.cleanliness[free] * 0.6
+    # dirty cells: reduce blue only → yellow tint; clean free cells: white
+    img[free, 2] = 1.0 - env.room.cleanliness[free] * 0.7
 
     img[env.room.obstacles] = [0.3, 0.3, 0.3]
     img[env.cleaned] = [0.6, 1.0, 0.6]
