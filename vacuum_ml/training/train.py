@@ -5,6 +5,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback
 
 from vacuum_ml.env.vacuum_env import VacuumEnv
+from vacuum_ml.training.policy import VacuumCNN
 
 
 def train(
@@ -12,7 +13,7 @@ def train(
     n_envs: int = 4,
     save_path: str = "models/vacuum_ppo",
 ) -> PPO:
-    """Train PPO on VacuumEnv. Saves checkpoint to save_path.zip."""
+    """Train PPO with CNN policy on VacuumEnv. Saves checkpoint to save_path.zip."""
     train_env = make_vec_env(VacuumEnv, n_envs=n_envs)
     eval_env = make_vec_env(VacuumEnv, n_envs=1)
 
@@ -25,16 +26,23 @@ def train(
         verbose=0,
     )
 
+    policy_kwargs = dict(
+        features_extractor_class=VacuumCNN,
+        features_extractor_kwargs=dict(features_dim=256),
+        normalize_images=False,  # obs is already float32 in [0, 1]
+    )
+
     model = PPO(
-        "MlpPolicy",
+        "CnnPolicy",
         train_env,
+        policy_kwargs=policy_kwargs,
         verbose=1,
         tensorboard_log="logs/",
         learning_rate=3e-4,
         n_steps=2048,
         batch_size=64,
         n_epochs=10,
-        ent_coef=0.01,  # entropy bonus prevents policy collapse to a single action
+        ent_coef=0.01,
     )
 
     model.learn(total_timesteps=total_timesteps, callback=eval_callback)
