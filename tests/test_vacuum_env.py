@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 import gymnasium as gym
 from gymnasium.utils.env_checker import check_env
 from vacuum_ml.env.vacuum_env import VacuumEnv
@@ -34,6 +33,7 @@ def test_step_counts_increment():
 def test_cleaning_reward_positive():
     env = make_env()
     env.reset()
+    assert not env.room.obstacles[0, 1], "test requires (0,1) to be obstacle-free for seed=42"
     # Move to an uncleaned cell — move right (action=3)
     _, reward, _, _, _ = env.step(3)
     assert reward > 0, "moving to new cell should give positive reward"
@@ -41,6 +41,7 @@ def test_cleaning_reward_positive():
 def test_revisit_penalised():
     env = make_env()
     env.reset()
+    assert not env.room.obstacles[0, 1], "test requires (0,1) to be obstacle-free for seed=42"
     env.step(3)   # move right: (0,0) -> (0,1), clean it
     env.step(2)   # move back left: (0,1) -> (0,0)
     # Now revisit (0,1) — it was already cleaned

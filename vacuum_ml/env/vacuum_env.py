@@ -18,15 +18,17 @@ class VacuumEnv(gym.Env):
         max_steps: int = 200,
         obstacle_density: float = 0.1,
         seed: int | None = None,
+        render_mode: str | None = None,
     ):
         super().__init__()
         self.width = width
         self.height = height
         self.max_steps = max_steps
         self.obstacle_density = obstacle_density
-        self._seed = seed
+        self.render_mode = render_mode
 
         self.action_space = spaces.Discrete(4)
+        # 2 position scalars + flattened (H, W, 2) room state
         obs_size = 2 + height * width * 2
         self.observation_space = spaces.Box(
             low=0.0, high=1.0, shape=(obs_size,), dtype=np.float32
@@ -40,7 +42,8 @@ class VacuumEnv(gym.Env):
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
-        self.room = Room(self.width, self.height, self.obstacle_density, seed=self._seed)
+        room_seed = int(self.np_random.integers(0, 2**31))
+        self.room = Room(self.width, self.height, self.obstacle_density, seed=room_seed)
         self.pos = (0, 0)
         self.steps = 0
         self.cleaned = np.zeros((self.height, self.width), dtype=bool)
