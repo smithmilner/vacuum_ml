@@ -1,4 +1,4 @@
-models/
+models/*.zip
 logs/
 __pycache__/
 *.pyc
