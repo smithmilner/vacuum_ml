@@ -156,7 +156,7 @@ class VacuumEnv(gym.Env):
             reward -= 5.0
             truncated = True
 
-        if self.steps >= self.max_steps:
+        if self.steps >= self.max_steps and not terminated:
             truncated = True
 
         return self._obs(), float(reward), terminated, truncated, self._info()
