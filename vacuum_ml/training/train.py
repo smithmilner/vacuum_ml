@@ -5,7 +5,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback
 
 from vacuum_ml.env.vacuum_env import VacuumEnv
-from vacuum_ml.training.policy import VacuumCNN
+from vacuum_ml.training.policy import VacuumMultiInputExtractor
 
 
 def train(
@@ -13,7 +13,7 @@ def train(
     n_envs: int = 4,
     save_path: str = "models/vacuum_ppo",
 ) -> PPO:
-    """Train PPO with CNN policy on VacuumEnv. Saves checkpoint to save_path.zip."""
+    """Train PPO with MultiInputPolicy on VacuumEnv. Saves checkpoint to save_path.zip."""
     train_env = make_vec_env(VacuumEnv, n_envs=n_envs)
     eval_env = make_vec_env(VacuumEnv, n_envs=1)
 
@@ -27,13 +27,13 @@ def train(
     )
 
     policy_kwargs = dict(
-        features_extractor_class=VacuumCNN,
-        features_extractor_kwargs=dict(features_dim=256),
-        normalize_images=False,  # obs is already float32 in [0, 1]
+        features_extractor_class=VacuumMultiInputExtractor,
+        features_extractor_kwargs=dict(features_dim=320),
+        normalize_images=False,
     )
 
     model = PPO(
-        "CnnPolicy",
+        "MultiInputPolicy",
         train_env,
         policy_kwargs=policy_kwargs,
         verbose=1,

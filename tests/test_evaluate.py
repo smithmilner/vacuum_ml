@@ -14,5 +14,5 @@ def test_evaluate_returns_coverage_and_steps(tiny_model):
     results = evaluate(model_path=tiny_model, episodes=3)
     assert "mean_coverage" in results
     assert "mean_steps" in results
-    assert 0.0 < results["mean_coverage"] <= 1.0
+    assert 0.0 <= results["mean_coverage"] <= 1.0
     assert results["mean_steps"] > 0

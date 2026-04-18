@@ -27,7 +27,7 @@ def evaluate(
         info: dict = {}
         while not done:
             action, _ = model.predict(obs, deterministic=deterministic)
-            obs, _, terminated, truncated, info = env.step(int(action))
+            obs, _, terminated, truncated, info = env.step(action)
             done = terminated or truncated
         coverages.append(info["coverage"])
         steps_list.append(info["steps"])
