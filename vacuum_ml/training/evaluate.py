@@ -10,6 +10,7 @@ def evaluate(
     model_path: str = "models/vacuum_ppo",
     episodes: int = 10,
     seed: int = 0,
+    deterministic: bool = False,
 ) -> dict:
     """Load a saved model and score it over N episodes."""
     if episodes <= 0:
@@ -25,7 +26,7 @@ def evaluate(
         done = False
         info: dict = {}
         while not done:
-            action, _ = model.predict(obs, deterministic=True)
+            action, _ = model.predict(obs, deterministic=deterministic)
             obs, _, terminated, truncated, info = env.step(int(action))
             done = terminated or truncated
         coverages.append(info["coverage"])
@@ -47,5 +48,6 @@ if __name__ == "__main__":
     parser.add_argument("--model", default="models/vacuum_ppo")
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--deterministic", action="store_true")
     args = parser.parse_args()
-    evaluate(args.model, args.episodes, args.seed)
+    evaluate(args.model, args.episodes, args.seed, args.deterministic)
