@@ -70,3 +70,16 @@ def test_coverage_info_key():
 def test_gymnasium_api_compliance():
     env = make_env()
     check_env(env, warn=True)
+
+def test_obs_shape_is_3_channel_2d():
+    env = make_env()
+    obs, _ = env.reset()
+    assert obs.shape == (3, 8, 8), f"expected (3, 8, 8), got {obs.shape}"
+    assert obs.dtype == np.float32
+
+def test_vacuum_position_channel():
+    env = make_env()
+    obs, _ = env.reset()
+    # Channel 2 is the vacuum position; start is (0,0)
+    assert obs[2, 0, 0] == 1.0
+    assert obs[2].sum() == 1.0  # exactly one cell marked

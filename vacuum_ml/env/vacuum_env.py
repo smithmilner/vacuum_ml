@@ -28,10 +28,9 @@ class VacuumEnv(gym.Env):
         self.render_mode = render_mode
 
         self.action_space = spaces.Discrete(4)
-        # 2 position scalars + flattened (H, W, 2) room state
-        obs_size = 2 + height * width * 2
+        # 3 channels: obstacles, cleanliness, vacuum position
         self.observation_space = spaces.Box(
-            low=0.0, high=1.0, shape=(obs_size,), dtype=np.float32
+            low=0.0, high=1.0, shape=(3, height, width), dtype=np.float32
         )
 
         # Set by reset()
@@ -86,8 +85,11 @@ class VacuumEnv(gym.Env):
 
     def _obs(self) -> np.ndarray:
         r, c = self.pos
-        h_norm = r / max(self.height - 1, 1)
-        w_norm = c / max(self.width - 1, 1)
-        pos = np.array([h_norm, w_norm], dtype=np.float32)
-        room_flat = self.room.get_state().flatten()
-        return np.concatenate([pos, room_flat])
+        room_state = self.room.get_state()  # (H, W, 2)
+        pos_channel = np.zeros((self.height, self.width), dtype=np.float32)
+        pos_channel[r, c] = 1.0
+        # Stack to (3, H, W): obstacles, cleanliness, vacuum position
+        return np.stack(
+            [room_state[:, :, 0], room_state[:, :, 1], pos_channel],
+            axis=0,
+        )
