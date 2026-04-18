@@ -66,9 +66,9 @@ The project uses **Reinforcement Learning** (PPO) to train a robot vacuum agent 
 
 **MLP policy (flat obs, retired):** After 2M steps, stochastic ~54% vs ~51% random. Deterministic collapsed to a single action (~7%). Hit a local optimum at 500k steps.
 
-**CNN policy (current):** Observation changed to `(3, H, W)` — channels: obstacles, cleanliness, vacuum position. Custom `VacuumCNN` feature extractor in `vacuum_ml/training/policy.py`. After 1M steps, deterministic policy no longer collapses (uses all 4 directions based on state). Some episodes hit 52% deterministically. Still training — needs 4M+ steps to converge fully.
+**CNN policy (current):** Observation changed to `(3, H, W)` — channels: obstacles, cleanliness, vacuum position. Custom `VacuumCNN` feature extractor in `vacuum_ml/training/policy.py`. After 4M steps, stochastic policy scores **56% vs 51% random**. Deterministic policy uses all 4 directions based on state (no single-action collapse), scoring ~17% mean but with individual episodes reaching 54%.
 
-CNN trains at ~900 fps vs ~6500 fps for MLP. Budget ~1 hour for a good CNN run at 4M steps.
+CNN trains at ~900 fps vs ~6500 fps for MLP. Budget ~1 hour for a 4M-step run. More steps will continue improving the deterministic policy.
 
 **Next improvement paths:**
 1. **Curriculum learning** — train first on obstacle-free rooms (`obstacle_density=0.0`), then gradually randomize. Reduces initial problem complexity.
