@@ -34,6 +34,7 @@ def train(
         n_steps=2048,
         batch_size=64,
         n_epochs=10,
+        ent_coef=0.01,  # entropy bonus prevents policy collapse to a single action
     )
 
     model.learn(total_timesteps=total_timesteps, callback=eval_callback)
