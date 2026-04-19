@@ -23,6 +23,7 @@ class VacuumEnv(gym.Env):
         self,
         width: float = 10.0,
         height: float = 10.0,
+        obstacle_count: int = 3,
         max_steps: int = 2000,
         seed: int | None = None,
         render_mode: str | None = None,
@@ -30,6 +31,7 @@ class VacuumEnv(gym.Env):
         super().__init__()
         self.width = width
         self.height = height
+        self.obstacle_count = obstacle_count
         self.max_steps = max_steps
         self.render_mode = render_mode
 
@@ -66,7 +68,7 @@ class VacuumEnv(gym.Env):
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
         room_seed = int(self.np_random.integers(0, 2 ** 31))
-        self.room = Room(self.width, self.height, seed=room_seed)
+        self.room = Room(self.width, self.height, obstacle_count=self.obstacle_count, seed=room_seed)
         self.dirt_map = DirtMap(self.room, vacuum_radius=VACUUM_RADIUS)
         self.partial_map = PartialMap(self.room)
 
@@ -135,6 +137,12 @@ class VacuumEnv(gym.Env):
         if is_overvisit and not collided:
             reward -= 0.05
 
+        # Frontier bonus: small reward for heading toward uncleaned dirt
+        look_x = self.x + np.cos(self.theta) * 1.0
+        look_y = self.y + np.sin(self.theta) * 1.0
+        if self.room.contains(look_x, look_y):
+            reward += 0.05 * self.dirt_map.current_dirt_at(look_x, look_y)
+
         # Check dock
         dist_dock = np.hypot(self.x - self.dock_x, self.y - self.dock_y)
         at_dock = dist_dock < DOCK_RADIUS and forward_speed < DOCK_SPEED_THRESHOLD
@@ -149,7 +157,7 @@ class VacuumEnv(gym.Env):
                 self._charge_steps_remaining = CHARGE_STEPS
             else:
                 coverage = self.dirt_map.mean_coverage()
-                reward += 10.0 * coverage
+                reward += 20.0 * coverage - 2.0 * self.battery
                 terminated = True
 
         if self.battery <= 0.0 and not at_dock:
@@ -164,6 +172,9 @@ class VacuumEnv(gym.Env):
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def set_obstacle_count(self, count: int) -> None:
+        self.obstacle_count = count
 
     def _do_charge_step(self) -> tuple:
         self._charge_steps_remaining -= 1

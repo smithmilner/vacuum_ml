@@ -11,12 +11,13 @@ def evaluate(
     episodes: int = 10,
     seed: int = 0,
     deterministic: bool = False,
+    obstacle_count: int = 3,
 ) -> dict:
     """Load a saved model and score it over N episodes."""
     if episodes <= 0:
         raise ValueError(f"episodes must be >= 1, got {episodes}")
     model = PPO.load(model_path)
-    env = VacuumEnv(seed=seed)
+    env = VacuumEnv(seed=seed, obstacle_count=obstacle_count)
 
     coverages: list[float] = []
     steps_list: list[int] = []
@@ -49,5 +50,6 @@ if __name__ == "__main__":
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--deterministic", action="store_true")
+    parser.add_argument("--obstacles", type=int, default=3)
     args = parser.parse_args()
-    evaluate(args.model, args.episodes, args.seed, args.deterministic)
+    evaluate(args.model, args.episodes, args.seed, args.deterministic, args.obstacles)
