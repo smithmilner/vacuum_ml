@@ -13,13 +13,11 @@ def train(
     n_envs: int = 4,
     save_path: str = "models/vacuum_ppo",
     load_path: str | None = None,
-    turn_penalty: float = 0.01,
     battery_threshold: float = 0.25,
     coverage_threshold: float = 0.85,
 ) -> PPO:
     """Train PPO with MultiInputPolicy on VacuumEnv. Saves checkpoint to save_path.zip."""
     env_kwargs = dict(
-        turn_penalty=turn_penalty,
         battery_threshold=battery_threshold,
         coverage_threshold=coverage_threshold,
     )
@@ -72,8 +70,7 @@ if __name__ == "__main__":
     parser.add_argument("--envs", type=int, default=4)
     parser.add_argument("--save", default="models/vacuum_ppo")
     parser.add_argument("--load", default=None)
-    parser.add_argument("--turn-penalty", type=float, default=0.01)
     parser.add_argument("--battery-threshold", type=float, default=0.25)
     parser.add_argument("--coverage-threshold", type=float, default=0.85)
     args = parser.parse_args()
-    train(args.timesteps, args.envs, args.save, args.load, args.turn_penalty, args.battery_threshold, args.coverage_threshold)
+    train(args.timesteps, args.envs, args.save, args.load, args.battery_threshold, args.coverage_threshold)

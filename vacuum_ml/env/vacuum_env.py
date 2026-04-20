@@ -24,7 +24,6 @@ class VacuumEnv(gym.Env):
         height: float = 10.0,
         obstacle_count: int = 3,
         max_steps: int = 2000,
-        turn_penalty: float = 0.01,
         battery_threshold: float = 0.25,
         coverage_threshold: float = 0.85,
         seed: int | None = None,
@@ -35,7 +34,6 @@ class VacuumEnv(gym.Env):
         self.height = height
         self.obstacle_count = obstacle_count
         self.max_steps = max_steps
-        self.turn_penalty = turn_penalty
         self.battery_threshold = battery_threshold
         self.coverage_threshold = coverage_threshold
         self.render_mode = render_mode
@@ -134,22 +132,11 @@ class VacuumEnv(gym.Env):
         self.steps += 1
 
         # Reward
-        reward = -0.005
-        if collided:
-            reward -= 0.3
+        reward = -0.01
         reward += first_pass
         reward += second_pass
         if is_overvisit and not collided:
             reward -= 0.05
-
-        # Frontier bonus: small reward for heading toward uncleaned dirt
-        look_x = self.x + np.cos(self.theta) * 1.0
-        look_y = self.y + np.sin(self.theta) * 1.0
-        if self.room.contains(look_x, look_y):
-            reward += 0.05 * self.dirt_map.current_dirt_at(look_x, look_y)
-
-        # Turn penalty: discourage random heading changes to bias toward straight-line motion
-        reward -= self.turn_penalty * abs(turn_delta)
 
         # Check dock
         dist_dock = np.hypot(self.x - self.dock_x, self.y - self.dock_y)
@@ -161,17 +148,15 @@ class VacuumEnv(gym.Env):
         if at_dock:
             coverage = self.dirt_map.mean_coverage()
             if coverage >= self.coverage_threshold:
-                reward += 10.0
+                reward += 50.0 * coverage / max(self.steps, 1)
                 terminated = True
             elif self.battery < self.battery_threshold:
-                reward += self.battery_threshold - self.battery
+                reward += 0.5
                 self._charging = True
                 self._charge_steps_remaining = CHARGE_STEPS
-            else:
-                reward += self.battery_threshold - self.battery
 
         if self.battery <= 0.0 and not at_dock:
-            reward -= 5.0
+            reward -= 10.0
             truncated = True
 
         if self.steps >= self.max_steps and not terminated:
@@ -190,7 +175,7 @@ class VacuumEnv(gym.Env):
         self._charge_steps_remaining -= 1
         self.battery = min(1.0, self.battery + 1.0 / CHARGE_STEPS)
         self.steps += 1
-        if self._charge_steps_remaining <= 0:
+        if self._charge_steps_remaining <= 0 or self.battery >= 1.0:
             self._charging = False
         truncated = self.steps >= self.max_steps
         return self._obs(), 0.0, False, truncated, self._info()
