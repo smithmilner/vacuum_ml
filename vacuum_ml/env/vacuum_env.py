@@ -13,7 +13,6 @@ VACUUM_RADIUS = 0.3      # world units
 DOCK_RADIUS = 0.5        # world units — must be within this to dock
 DOCK_SPEED_THRESHOLD = 0.05  # forward_speed below this = docking intent
 CHARGE_STEPS = 100       # steps to fully recharge
-LOW_BATTERY = 0.2        # threshold below which docking charges instead of terminates
 
 
 class VacuumEnv(gym.Env):
@@ -25,6 +24,9 @@ class VacuumEnv(gym.Env):
         height: float = 10.0,
         obstacle_count: int = 3,
         max_steps: int = 2000,
+        turn_penalty: float = 0.01,
+        battery_threshold: float = 0.25,
+        coverage_threshold: float = 0.85,
         seed: int | None = None,
         render_mode: str | None = None,
     ):
@@ -33,6 +35,9 @@ class VacuumEnv(gym.Env):
         self.height = height
         self.obstacle_count = obstacle_count
         self.max_steps = max_steps
+        self.turn_penalty = turn_penalty
+        self.battery_threshold = battery_threshold
+        self.coverage_threshold = coverage_threshold
         self.render_mode = render_mode
 
         self.action_space = spaces.Box(
@@ -143,6 +148,9 @@ class VacuumEnv(gym.Env):
         if self.room.contains(look_x, look_y):
             reward += 0.05 * self.dirt_map.current_dirt_at(look_x, look_y)
 
+        # Turn penalty: discourage random heading changes to bias toward straight-line motion
+        reward -= self.turn_penalty * abs(turn_delta)
+
         # Check dock
         dist_dock = np.hypot(self.x - self.dock_x, self.y - self.dock_y)
         at_dock = dist_dock < DOCK_RADIUS and forward_speed < DOCK_SPEED_THRESHOLD
@@ -151,14 +159,16 @@ class VacuumEnv(gym.Env):
         truncated = False
 
         if at_dock:
-            if self.battery < LOW_BATTERY:
-                reward += 0.5
+            coverage = self.dirt_map.mean_coverage()
+            if coverage >= self.coverage_threshold:
+                reward += 10.0
+                terminated = True
+            elif self.battery < self.battery_threshold:
+                reward += self.battery_threshold - self.battery
                 self._charging = True
                 self._charge_steps_remaining = CHARGE_STEPS
             else:
-                coverage = self.dirt_map.mean_coverage()
-                reward += 20.0 * coverage - 2.0 * self.battery
-                terminated = True
+                reward += self.battery_threshold - self.battery
 
         if self.battery <= 0.0 and not at_dock:
             reward -= 5.0

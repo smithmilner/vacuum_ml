@@ -78,8 +78,18 @@ def test_docking_with_low_battery_triggers_charging():
     assert env._charging
 
 
-def test_docking_with_high_battery_terminates():
+def test_docking_with_high_battery_does_not_terminate_below_coverage_threshold():
     env = make_env()
+    env.reset()
+    env.battery = 0.9
+    env.x = env.dock_x
+    env.y = env.dock_y
+    _, _, terminated, _, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))
+    assert not terminated
+
+
+def test_docking_above_coverage_threshold_terminates():
+    env = VacuumEnv(width=10.0, height=10.0, max_steps=500, coverage_threshold=0.0, seed=42)
     env.reset()
     env.battery = 0.9
     env.x = env.dock_x

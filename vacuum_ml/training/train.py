@@ -12,10 +12,19 @@ def train(
     total_timesteps: int = 500_000,
     n_envs: int = 4,
     save_path: str = "models/vacuum_ppo",
+    load_path: str | None = None,
+    turn_penalty: float = 0.01,
+    battery_threshold: float = 0.25,
+    coverage_threshold: float = 0.85,
 ) -> PPO:
     """Train PPO with MultiInputPolicy on VacuumEnv. Saves checkpoint to save_path.zip."""
-    train_env = make_vec_env(VacuumEnv, n_envs=n_envs)
-    eval_env = make_vec_env(VacuumEnv, n_envs=1)
+    env_kwargs = dict(
+        turn_penalty=turn_penalty,
+        battery_threshold=battery_threshold,
+        coverage_threshold=coverage_threshold,
+    )
+    train_env = make_vec_env(VacuumEnv, n_envs=n_envs, env_kwargs=env_kwargs)
+    eval_env = make_vec_env(VacuumEnv, n_envs=1, env_kwargs=env_kwargs)
 
     eval_callback = EvalCallback(
         eval_env,
@@ -32,20 +41,24 @@ def train(
         normalize_images=False,
     )
 
-    model = PPO(
-        "MultiInputPolicy",
-        train_env,
-        policy_kwargs=policy_kwargs,
-        verbose=1,
-        tensorboard_log="logs/",
-        learning_rate=3e-4,
-        n_steps=2048,
-        batch_size=64,
-        n_epochs=10,
-        ent_coef=0.01,
-    )
+    if load_path:
+        model = PPO.load(load_path, env=train_env, device="cuda")
+    else:
+        model = PPO(
+            "MultiInputPolicy",
+            train_env,
+            policy_kwargs=policy_kwargs,
+            verbose=1,
+            tensorboard_log="logs/",
+            learning_rate=3e-4,
+            n_steps=2048,
+            batch_size=64,
+            n_epochs=10,
+            ent_coef=0.01,
+            device="cuda",
+        )
 
-    model.learn(total_timesteps=total_timesteps, callback=eval_callback)
+    model.learn(total_timesteps=total_timesteps, callback=eval_callback, reset_num_timesteps=load_path is None)
     model.save(save_path)
     print(f"Model saved to {save_path}.zip")
     return model
@@ -58,5 +71,9 @@ if __name__ == "__main__":
     parser.add_argument("--timesteps", type=int, default=500_000)
     parser.add_argument("--envs", type=int, default=4)
     parser.add_argument("--save", default="models/vacuum_ppo")
+    parser.add_argument("--load", default=None)
+    parser.add_argument("--turn-penalty", type=float, default=0.01)
+    parser.add_argument("--battery-threshold", type=float, default=0.25)
+    parser.add_argument("--coverage-threshold", type=float, default=0.85)
     args = parser.parse_args()
-    train(args.timesteps, args.envs, args.save)
+    train(args.timesteps, args.envs, args.save, args.load, args.turn_penalty, args.battery_threshold, args.coverage_threshold)
